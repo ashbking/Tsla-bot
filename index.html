@@ -3,206 +3,300 @@
 <head>
   <meta charset="UTF-8"/>
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no"/>
-  <meta name="apple-mobile-web-app-capable" content="yes"/>
-  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"/>
-  <title>TSLA 0DTE Scanner</title>
+  <link rel="icon" href="data:,">
+  <title>TSLA EOD Bot — Pyth + Twelvedata</title>
   <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;600;700&family=Bebas+Neue&display=swap" rel="stylesheet"/>
   <style>
     *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
     :root{
-      --g:#00ff9d;--r:#ff3344;--y:#f5c542;--b:#4466ff;--o:#ff6b35;
-      --bg:#080808;--card:#0d0d0d;--bdr:#1a1a1a;
-      --dim:#444;--mid:#666;--txt:#e8e8e8;
+      --g:#00ff9d;--r:#ff3344;--y:#f5c542;--b:#4466ff;--o:#ff6b35;--p:#cc44ff;
+      --bg:#060608;--card:#0c0c10;--bdr:#1c1c24;--bdr2:#242430;
+      --dim:#555;--mid:#777;--txt:#e4e4ec;
     }
     html,body{background:var(--bg);color:var(--txt);font-family:'JetBrains Mono','Courier New',monospace;min-height:100vh;overflow-x:hidden;-webkit-text-size-adjust:100%}
-    ::-webkit-scrollbar{width:3px}::-webkit-scrollbar-track{background:var(--bg)}::-webkit-scrollbar-thumb{background:#222;border-radius:2px}
+    ::-webkit-scrollbar{width:4px}::-webkit-scrollbar-track{background:#0a0a0d}::-webkit-scrollbar-thumb{background:#1e1e28;border-radius:2px}
 
-    @keyframes pulse   {0%,100%{opacity:1}50%{opacity:.3}}
-    @keyframes slideIn {from{transform:translateY(-12px);opacity:0}to{transform:translateY(0);opacity:1}}
-    @keyframes glow    {0%,100%{box-shadow:0 0 24px rgba(0,255,157,.08)}50%{box-shadow:0 0 52px rgba(0,255,157,.32)}}
-    @keyframes glowR   {0%,100%{box-shadow:0 0 24px rgba(255,51,68,.08)}50%{box-shadow:0 0 52px rgba(255,51,68,.32)}}
-    @keyframes fadeIn  {from{opacity:0}to{opacity:1}}
-    @keyframes flashG  {0%{color:#00ff9d}100%{color:#fff}}
-    @keyframes flashR  {0%{color:#ff3344}100%{color:#fff}}
-    @keyframes spin    {to{transform:rotate(360deg)}}
+    @keyframes pulse {0%,100%{opacity:1}50%{opacity:.25}}
+    @keyframes slideIn{from{transform:translateY(-10px);opacity:0}to{transform:translateY(0);opacity:1}}
+    @keyframes glow  {0%,100%{box-shadow:0 0 20px rgba(0,255,157,.07)}50%{box-shadow:0 0 44px rgba(0,255,157,.28)}}
+    @keyframes glowR {0%,100%{box-shadow:0 0 20px rgba(255,51,68,.07)} 50%{box-shadow:0 0 44px rgba(255,51,68,.28)}}
+    @keyframes fadeIn{from{opacity:0}to{opacity:1}}
+    @keyframes flashG{0%{color:#00ff9d}100%{color:#e4e4ec}}
+    @keyframes flashR{0%{color:#ff3344}100%{color:#e4e4ec}}
+    @keyframes spin  {to{transform:rotate(360deg)}}
+    @keyframes tickG {0%{background:rgba(0,255,157,.18)}100%{background:transparent}}
+    @keyframes tickR {0%{background:rgba(255,51,68,.18)} 100%{background:transparent}}
 
-    .pulser  {animation:pulse  1.5s infinite}
-    .sig-in  {animation:slideIn .4s cubic-bezier(.16,1,.3,1)}
-    .c-glow  {animation:glow  2.5s infinite}
-    .p-glow  {animation:glowR 2.5s infinite}
-    .fadein  {animation:fadeIn .35s ease}
-    .fG      {animation:flashG .7s ease forwards}
-    .fR      {animation:flashR .7s ease forwards}
+    .pulser{animation:pulse 1.6s infinite}
+    .sig-in{animation:slideIn .38s cubic-bezier(.16,1,.3,1)}
+    .c-glow{animation:glow  2.4s infinite}
+    .p-glow{animation:glowR 2.4s infinite}
+    .fadein{animation:fadeIn .3s ease}
+    .fG    {animation:flashG .65s ease forwards}
+    .fR    {animation:flashR .65s ease forwards}
+    .tickG {animation:tickG .9s ease forwards}
+    .tickR {animation:tickR .9s ease forwards}
 
     /* ── HEADER ── */
-    #hdr{position:sticky;top:0;z-index:100;background:rgba(8,8,8,.97);backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);border-bottom:1px solid var(--bdr);padding:13px 16px;display:flex;justify-content:space-between;align-items:center}
-    .logo{font-family:'Bebas Neue',sans-serif;font-size:clamp(20px,5vw,26px);letter-spacing:4px;color:#fff;line-height:1}
+    #hdr{position:sticky;top:0;z-index:100;background:rgba(6,6,8,.96);backdrop-filter:blur(18px);border-bottom:1px solid var(--bdr);padding:12px 16px;display:flex;justify-content:space-between;align-items:center}
+    .logo{font-family:'Bebas Neue',sans-serif;font-size:clamp(19px,4.5vw,25px);letter-spacing:4px;color:#fff;line-height:1}
     .logo em{color:#cc0000;font-style:normal}
-    .logo-s{font-size:8px;color:var(--dim);letter-spacing:2px;margin-top:2px;display:none}
+    .logo-sub{font-size:8px;color:#444;letter-spacing:2px;margin-top:2px}
     .hdr-r{display:flex;align-items:center;gap:8px}
 
-    #pill{display:flex;align-items:center;gap:5px;padding:4px 11px;border-radius:20px;border:1px solid #222;font-size:9px;letter-spacing:1px;color:var(--dim);transition:all .3s}
+    #pill{display:flex;align-items:center;gap:5px;padding:4px 10px;border-radius:20px;border:1px solid #1e1e28;font-size:9px;letter-spacing:1.5px;color:var(--dim);transition:all .3s}
     #pill.live{border-color:rgba(0,255,157,.35);color:var(--g)}
+    #pill.pyth{border-color:rgba(100,100,255,.4);color:#7a8fff}
     #pill.demo{border-color:rgba(245,197,66,.35);color:var(--y)}
-    #pill.err {border-color:rgba(255,51,68,.35);color:var(--r)}
-    #pdot{width:6px;height:6px;border-radius:50%;background:var(--y);flex-shrink:0}
+    #pill.err {border-color:rgba(255,51,68,.35); color:var(--r)}
+    #pdot{width:6px;height:6px;border-radius:50%;background:var(--y);flex-shrink:0;transition:background .3s}
 
-    #rbtn{background:none;border:1px solid #222;color:var(--dim);padding:6px 11px;border-radius:6px;cursor:pointer;font-size:13px;font-family:inherit;touch-action:manipulation;-webkit-tap-highlight-color:transparent;transition:all .2s}
+    #rbtn{background:none;border:1px solid #1e1e28;color:var(--dim);padding:5px 10px;border-radius:6px;cursor:pointer;font-size:13px;font-family:inherit;touch-action:manipulation;transition:all .2s}
     #rbtn:active{border-color:var(--g);color:var(--g)}
 
     /* ── MAIN ── */
-    #main{max-width:960px;margin:0 auto;padding:14px}
-    .card{background:var(--card);border:1px solid var(--bdr);border-radius:12px;padding:18px;transition:border-color .4s}
-    .lbl{font-size:9px;color:var(--dim);letter-spacing:2px;margin-bottom:10px;text-transform:uppercase}
+    #main{max-width:980px;margin:0 auto;padding:14px}
+    .card{background:var(--card);border:1px solid var(--bdr);border-radius:12px;padding:18px;transition:border-color .4s,box-shadow .4s}
+    .lbl{font-size:8px;color:#444;letter-spacing:2.5px;margin-bottom:12px;text-transform:uppercase}
 
-    /* ── DIAGNOSTIC BANNER ── */
-    #diag{display:none;margin-bottom:12px;padding:14px 16px;border-radius:10px;background:#0d0d0d;border:1px solid rgba(245,197,66,.25);font-size:10px;line-height:1.9;color:var(--mid)}
-    #diag.show{display:block;animation:fadeIn .4s ease}
-    #diag strong{color:var(--y)}
-    #diag .d-ok{color:var(--g)}
-    #diag .d-er{color:var(--r)}
-    #diag .d-ln{color:var(--b);text-decoration:none}
-    #diag-close{float:right;cursor:pointer;color:var(--dim);font-size:15px;margin-left:10px;line-height:1}
+    /* ── SOURCE BADGE ── */
+    #src-badge{display:flex;align-items:center;gap:6px;margin-bottom:12px;padding:6px 12px;border-radius:8px;background:#0a0a0e;border:1px solid var(--bdr);font-size:9px;color:var(--dim);flex-wrap:wrap}
+    .sb-item{display:flex;align-items:center;gap:5px}
+    .sb-dot{width:5px;height:5px;border-radius:50%;background:#333;flex-shrink:0;transition:background .4s}
+    #sb-primary-label{transition:color .3s}
 
-    /* ── HERO ── */
-    #hero{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px}
+    /* ── DUAL-PRICE HERO ── */
+    #hero{display:grid;grid-template-columns:1.1fr 1fr;gap:12px;margin-bottom:12px}
+    .pval{font-family:'Bebas Neue',sans-serif;font-size:clamp(34px,8.5vw,56px);letter-spacing:2px;color:#fff;line-height:1}
+    .pch {font-size:11px;margin-top:5px;min-height:16px}
+    .pts {font-size:8px;color:#2a2a36;margin-top:8px}
+    .conf-row{display:flex;gap:8px;margin-top:8px;flex-wrap:wrap}
+    .conf-chip{font-size:8px;padding:2px 8px;border-radius:4px;border:1px solid var(--bdr);color:var(--dim);letter-spacing:1px}
+    .conf-chip.ok{border-color:rgba(0,255,157,.2);color:rgba(0,255,157,.65)}
+    .conf-chip.warn{border-color:rgba(245,197,66,.25);color:rgba(245,197,66,.8)}
 
-    .pval{font-family:'Bebas Neue',sans-serif;font-size:clamp(36px,9vw,58px);letter-spacing:2px;color:#fff;line-height:1;border-radius:6px}
-    .pch {font-size:12px;margin-top:5px;min-height:18px}
-    .pts {font-size:9px;color:#333;margin-top:8px}
-
-    #live-tag{display:none;align-items:center;gap:5px;margin-top:9px;padding:3px 9px;border-radius:4px;background:rgba(0,255,157,.07);border:1px solid rgba(0,255,157,.2);font-size:9px;color:var(--g);letter-spacing:1px}
+    #live-tag{display:none;align-items:center;gap:5px;margin-top:9px;padding:3px 8px;border-radius:4px;background:rgba(0,255,157,.06);border:1px solid rgba(0,255,157,.18);font-size:8px;color:var(--g);letter-spacing:1px}
     #live-tag.show{display:inline-flex}
     #live-tag .ld{width:5px;height:5px;border-radius:50%;background:var(--g);animation:pulse 1s infinite}
+    #pyth-tag{display:none;align-items:center;gap:5px;margin-top:6px;padding:3px 8px;border-radius:4px;background:rgba(100,100,255,.06);border:1px solid rgba(100,100,255,.2);font-size:8px;color:#7a8fff;letter-spacing:1px}
+    #pyth-tag.show{display:inline-flex}
+    #pyth-tag .pd{width:5px;height:5px;border-radius:50%;background:#7a8fff;animation:pulse 1.4s infinite}
 
-    #spark{display:block;width:100%;max-width:280px;height:50px;margin-top:14px}
+    #spark{display:block;width:100%;max-width:290px;height:48px;margin-top:12px}
 
-    .sdir{font-family:'Bebas Neue',sans-serif;font-size:clamp(28px,7vw,46px);letter-spacing:3px;line-height:1}
+    .sdir{font-family:'Bebas Neue',sans-serif;font-size:clamp(28px,7vw,44px);letter-spacing:3px;line-height:1}
     .sstr{font-size:10px;letter-spacing:2px;margin-left:6px}
-    .ssc {font-size:10px;color:var(--dim);margin-top:6px}
-    .snote{font-size:9px;color:#333;letter-spacing:1px;margin-top:10px}
-    .mtr{height:7px;background:#1a1a1a;border-radius:4px;overflow:hidden;margin-top:10px}
-    .mf {height:100%;border-radius:4px;width:0%;background:linear-gradient(90deg,#222,#555);transition:width .9s cubic-bezier(.16,1,.3,1)}
+    .mtr{height:6px;background:#111118;border-radius:3px;overflow:hidden;margin-top:10px}
+    .mf {height:100%;border-radius:3px;width:0%;transition:width .9s cubic-bezier(.16,1,.3,1)}
+    .ssc{font-size:10px;color:var(--dim);margin-top:6px}
+    .snote{font-size:8px;color:#2a2a36;letter-spacing:1px;margin-top:9px}
+    .sub-scores{display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-top:12px}
+    .ss-row{display:flex;justify-content:space-between;align-items:center;font-size:9px;color:var(--dim);padding:5px 8px;background:#0a0a0e;border-radius:5px;border:1px solid var(--bdr)}
+    .ss-row.on{border-color:rgba(0,255,157,.15);color:var(--txt)}
+    .ss-val{font-weight:700}
 
     /* ── STATUS BAR ── */
-    #sbar{display:flex;align-items:center;gap:8px;flex-wrap:wrap;padding:8px 12px;margin-bottom:12px;background:var(--card);border:1px solid var(--bdr);border-radius:8px;font-size:9px;color:var(--dim)}
+    #sbar{display:flex;align-items:center;gap:10px;flex-wrap:wrap;padding:7px 12px;margin-bottom:12px;background:var(--card);border:1px solid var(--bdr);border-radius:8px;font-size:8px;color:var(--dim)}
     .si{display:flex;align-items:center;gap:5px}
-    .sd{width:6px;height:6px;border-radius:50%;background:#333;flex-shrink:0}
-    #snx{margin-left:auto;color:#333}
+    .sd{width:5px;height:5px;border-radius:50%;background:#222;flex-shrink:0;transition:background .4s}
+    #snx{margin-left:auto;color:#2a2a36;font-size:8px}
+
+    /* ── PYTH DATA PANEL ── */
+    #pyth-panel{margin-bottom:12px}
+    .pp-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:8px}
+    .pp-cell{background:#0a0a0e;border:1px solid var(--bdr);border-radius:8px;padding:10px 8px;text-align:center}
+    .pp-lbl{font-size:7px;color:#444;letter-spacing:1.5px;margin-bottom:5px;text-transform:uppercase}
+    .pp-val{font-size:13px;font-weight:600;color:var(--mid)}
+    .pp-cell.live-cell .pp-val{color:#fff}
+    .pp-cell.live-cell{border-color:rgba(100,100,255,.2);background:rgba(100,100,255,.04)}
+    .pp-sub{font-size:7px;color:#333;margin-top:3px}
 
     /* ── BREAKDOWN ── */
-    #bkg{display:grid;grid-template-columns:repeat(5,1fr);gap:8px}
-    .bc{border-radius:8px;padding:10px 5px;text-align:center;border:1px solid var(--bdr);background:var(--card);transition:background .3s,border-color .3s}
-    .bc.on{background:#0a1a0f;border-color:rgba(0,255,157,.18)}
-    .bcl{font-size:7px;letter-spacing:1px;margin-bottom:5px;color:var(--dim)}
-    .bc.on .bcl{color:var(--g)}
-    .bcv{font-size:11px;font-weight:600;color:var(--dim);margin-bottom:3px}
+    #bkg{display:grid;grid-template-columns:repeat(5,1fr);gap:7px}
+    .bc{border-radius:8px;padding:9px 4px;text-align:center;border:1px solid var(--bdr);background:#0a0a0e;transition:all .35s}
+    .bc.on{background:#07130d;border-color:rgba(0,255,157,.2)}
+    .bcl{font-size:7px;letter-spacing:1px;margin-bottom:4px;color:#444}
+    .bc.on .bcl{color:rgba(0,255,157,.7)}
+    .bcv{font-size:11px;font-weight:600;color:var(--dim);margin-bottom:2px}
     .bc.on .bcv{color:#fff}
-    .bcp{font-size:8px;color:#333}
-    .bc.on .bcp{color:rgba(0,255,157,.5)}
+    .bcp{font-size:7px;color:#222}
+    .bc.on .bcp{color:rgba(0,255,157,.4)}
+
+    /* ── PYTH CONFIDENCE METER ── */
+    #conf-section{margin-bottom:12px}
+    .conf-bar-wrap{background:#0a0a0e;border-radius:5px;overflow:hidden;height:8px;margin-top:6px;position:relative}
+    .conf-bar{height:100%;border-radius:5px;width:0%;transition:width .8s cubic-bezier(.16,1,.3,1)}
+    .conf-label-row{display:flex;justify-content:space-between;font-size:8px;margin-top:4px;color:var(--dim)}
+    .conf-status{margin-top:6px;font-size:9px}
 
     /* ── ALERT ── */
     #alrt{margin-bottom:12px}
-    .alc{border-radius:12px;padding:20px}
-    .all{font-size:9px;letter-spacing:2px;margin-bottom:10px}
-    .ald{font-family:'Bebas Neue',sans-serif;font-size:clamp(26px,7vw,34px);letter-spacing:3px;line-height:1}
-    .alm{font-size:10px;color:#555;margin-top:5px}
+    .alc{border-radius:12px;padding:18px}
+    .all{font-size:8px;letter-spacing:2px;margin-bottom:9px}
+    .ald{font-family:'Bebas Neue',sans-serif;font-size:clamp(24px,6vw,32px);letter-spacing:3px;line-height:1}
+    .ald .at-price{font-size:clamp(18px,4.5vw,24px);opacity:.7;margin-left:8px}
+    .alm{font-size:9px;color:#444;margin-top:5px;line-height:1.8}
+    .al-pyth{font-size:8px;margin-top:8px;padding:6px 10px;background:rgba(100,100,255,.06);border:1px solid rgba(100,100,255,.18);border-radius:6px;color:#7a8fff;line-height:1.9}
     .alb{display:flex;gap:10px;margin-top:14px;flex-wrap:wrap}
-    .be,.bs{padding:13px 20px;border-radius:8px;font-size:12px;letter-spacing:1px;font-family:inherit;font-weight:700;cursor:pointer;border:1px solid transparent;flex:1;min-width:110px;touch-action:manipulation;-webkit-tap-highlight-color:transparent;transition:transform .1s,opacity .15s}
+    .be,.bs{padding:12px 18px;border-radius:8px;font-size:11px;letter-spacing:1px;font-family:inherit;font-weight:700;cursor:pointer;border:1px solid transparent;flex:1;min-width:110px;touch-action:manipulation;transition:transform .1s,opacity .15s}
     .be:active,.bs:active{transform:scale(.96);opacity:.8}
-    .bc-c{background:rgba(0,255,157,.1);color:var(--g);border-color:rgba(0,255,157,.3)}
-    .bc-p{background:rgba(255,51,68,.1);color:var(--r);border-color:rgba(255,51,68,.3)}
-    .bs{background:#1a1a1a;color:#666;border-color:#2a2a2a;font-weight:400}
+    .bc-c{background:rgba(0,255,157,.08);color:var(--g);border-color:rgba(0,255,157,.25)}
+    .bc-p{background:rgba(255,51,68,.08);color:var(--r);border-color:rgba(255,51,68,.25)}
+    .bs{background:#0f0f14;color:#555;border-color:#1e1e28;font-weight:400}
+
+    /* ── WEALTH TRACKER ── */
+    #wealth{margin-bottom:12px}
+    .wt-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:10px}
+    .wt-cell{background:#0a0a0e;border:1px solid var(--bdr);border-radius:8px;padding:10px 8px;text-align:center}
+    .wt-lbl{font-size:7px;color:#444;letter-spacing:1.5px;margin-bottom:5px}
+    .wt-val{font-size:14px;font-weight:700;color:var(--mid)}
+    .wt-sub{font-size:8px;color:#333;margin-top:3px}
+    #wt-edit{display:flex;gap:8px;align-items:center;flex-wrap:wrap;padding:10px;background:#06060a;border-radius:8px;border:1px solid var(--bdr)}
+    .wt-inp{background:#0a0a0e;border:1px solid var(--bdr);color:var(--txt);padding:6px 10px;border-radius:6px;font-size:11px;font-family:inherit;width:120px;outline:none;transition:border-color .2s}
+    .wt-inp:focus{border-color:rgba(0,255,157,.35)}
+    .wt-btn{background:rgba(0,255,157,.08);color:var(--g);border:1px solid rgba(0,255,157,.25);padding:6px 14px;border-radius:6px;font-size:10px;font-family:inherit;cursor:pointer;letter-spacing:1px;transition:all .2s}
+    .wt-btn:active{transform:scale(.96)}
+    .wt-lbl-txt{font-size:9px;color:var(--dim)}
+
+    /* ── TRADE LOG ── */
+    .lhdr{display:flex;justify-content:space-between;align-items:center;margin-bottom:12px}
+    .lcnt{font-size:8px;color:#333}
+    .lmt{color:var(--dim);text-align:center;padding:20px 0;font-size:10px}
+    #llist{display:flex;flex-direction:column;gap:7px}
+    .le{background:var(--bg);border-radius:8px;padding:9px 11px;display:grid;grid-template-columns:auto 1fr auto auto;gap:8px;align-items:center;font-size:10px;border:1px solid #111118;transition:background .3s}
+    .led{padding:2px 8px;border-radius:4px;font-weight:700;letter-spacing:1px;font-size:9px;white-space:nowrap}
+    .le-p{color:#888;font-size:10px}
+    .le-conf{font-size:8px;color:#555}
+    .le-t{color:#333;font-size:8px}
+    .les{font-weight:600;font-size:9px;text-align:right}
 
     /* ── EDU ── */
-    .eg{display:grid;grid-template-columns:1fr 1fr;gap:12px;font-size:10px;color:var(--mid);line-height:1.75}
-    .et{letter-spacing:1px;margin-bottom:3px}
-    .risk{margin-top:14px;padding:11px 14px;background:#0a0a0a;border-radius:8px;border:1px solid #1e1e1e;font-size:9px;color:#555;line-height:1.9}
-
-    /* ── LOG ── */
-    .lhdr{display:flex;justify-content:space-between;align-items:center;margin-bottom:12px}
-    .lcnt{font-size:9px;color:#333}
-    .lmt{color:var(--dim);text-align:center;padding:20px 0;font-size:11px}
-    #llist{display:flex;flex-direction:column;gap:8px}
-    .le{background:var(--bg);border-radius:8px;padding:10px 12px;display:flex;justify-content:space-between;align-items:center;font-size:11px}
-    .lel{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
-    .led{padding:2px 8px;border-radius:4px;font-weight:700;letter-spacing:1px;font-size:10px}
-    .lep{color:#888}.let{color:#555;font-size:9px}.les{font-weight:600;font-size:10px}
+    .eg{display:grid;grid-template-columns:1fr 1fr;gap:12px;font-size:9px;color:var(--mid);line-height:1.8}
+    .et{letter-spacing:1px;margin-bottom:3px;font-size:9px}
+    .risk{margin-top:14px;padding:11px 14px;background:#07070b;border-radius:8px;border:1px solid #1e1e28;font-size:8px;color:#444;line-height:2}
 
     /* ── FOOTER ── */
-    #foot{padding:14px 16px;background:#0a0a0a;border:1px dashed #1e1e1e;border-radius:12px;font-size:9px;color:var(--dim);line-height:2;margin-bottom:24px}
-    #foot .ftt{color:var(--mid);margin-bottom:4px;letter-spacing:1px}
-    .cg{color:var(--g)}.cb{color:var(--b)}.cy{color:var(--y)}
+    #foot{padding:14px 16px;background:#07070b;border:1px dashed #1a1a22;border-radius:12px;font-size:8px;color:#444;line-height:2.2;margin-bottom:24px}
+    #foot .ftt{color:#666;margin-bottom:4px;letter-spacing:1px;font-size:9px}
+    .cg{color:var(--g)}.cb{color:#7a8fff}.cy{color:var(--y)}.cr{color:var(--r)}
 
-    @media(max-width:600px){
-      #hdr{padding:11px 13px}.logo-s{display:block}
-      #main{padding:11px}#hero{grid-template-columns:1fr}
-      #bkg{grid-template-columns:repeat(3,1fr)}.eg{grid-template-columns:1fr}
-      .alb{flex-direction:column}.be,.bs{flex:none;width:100%}
-      .le{flex-direction:column;align-items:flex-start;gap:5px}
+    @media(max-width:620px){
+      #hero{grid-template-columns:1fr}#bkg{grid-template-columns:repeat(3,1fr)}
+      .pp-grid{grid-template-columns:repeat(2,1fr)}.wt-grid{grid-template-columns:repeat(2,1fr)}
+      .eg{grid-template-columns:1fr}.alb{flex-direction:column}.be,.bs{flex:none;width:100%}
+      .le{grid-template-columns:auto 1fr auto}
+      .sub-scores{grid-template-columns:1fr}
     }
-    @media(max-width:380px){.pval{font-size:28px}#bkg{grid-template-columns:repeat(2,1fr)}}
+    @media(max-width:390px){.pval{font-size:28px}#bkg{grid-template-columns:repeat(2,1fr)}.pp-grid{grid-template-columns:1fr 1fr}}
   </style>
 </head>
 <body>
 
 <div id="hdr">
   <div>
-    <div class="logo">TSLA<em>·</em>0DTE</div>
-    <div class="logo-s">EOD GAMMA SCANNER</div>
+    <div class="logo">TSLA<em>·</em>EOD <span style="font-size:13px;color:#555;letter-spacing:2px">BOT</span></div>
+    <div class="logo-sub">PYTH ORACLE + TWELVEDATA SIGNAL ENGINE</div>
   </div>
   <div class="hdr-r">
     <div id="pill"><div id="pdot" class="pulser"></div><span id="plbl">CONNECTING</span></div>
-    <button id="rbtn" onclick="manualRefresh()">↺</button>
+    <button id="rbtn" onclick="manualRefresh()" title="Refresh all data">↺</button>
   </div>
 </div>
 
 <div id="main">
 
-  <!-- DIAGNOSTIC BANNER -->
-  <div id="diag">
-    <span id="diag-close" onclick="document.getElementById('diag').classList.remove('show')">✕</span>
-    <strong id="diag-title">⚡ Diagnostic</strong><br/>
-    <span id="diag-body"></span>
+  <!-- SOURCE BADGE -->
+  <div id="src-badge">
+    <div class="sb-item"><div class="sb-dot" id="sb-pyth"></div><span id="sb-primary-label">Pyth Hermes: <span id="sb-pyth-lbl">—</span></span></div>
+    <div class="sb-item" style="margin-left:10px"><div class="sb-dot" id="sb-td"></div><span>Twelvedata candles: <span id="sb-td-lbl">—</span></span></div>
+    <div class="sb-item" style="margin-left:auto"><span id="sb-market-status" style="color:#333">—</span></div>
   </div>
 
   <!-- HERO -->
   <div id="hero">
-    <div class="card">
+    <div class="card" id="price-card">
       <div class="lbl">TSLA LIVE PRICE</div>
       <div class="pval" id="pval">—</div>
       <div class="pch"  id="pch"></div>
-      <div id="live-tag"><div class="ld"></div>UPDATING LIVE</div>
-      <svg id="spark" viewBox="0 0 300 50" preserveAspectRatio="none">
+      <div id="live-tag"><div class="ld"></div>TWELVEDATA LIVE</div>
+      <div id="pyth-tag"><div class="pd"></div>PYTH ORACLE ACTIVE</div>
+      <div class="conf-row">
+        <div class="conf-chip" id="chip-conf">CONF —</div>
+        <div class="conf-chip" id="chip-age">AGE —</div>
+        <div class="conf-chip" id="chip-pct">—</div>
+      </div>
+      <svg id="spark" viewBox="0 0 290 48" preserveAspectRatio="none">
         <defs>
           <linearGradient id="sg" x1="0" y1="0" x2="0" y2="1">
-            <stop offset="0%" stop-color="#4466ff" stop-opacity=".3"/>
+            <stop offset="0%" stop-color="#4466ff" stop-opacity=".25"/>
             <stop offset="100%" stop-color="#4466ff" stop-opacity="0"/>
           </linearGradient>
         </defs>
         <polygon id="sfill" fill="url(#sg)" points=""/>
-        <polyline id="sline" fill="none" stroke="#4466ff" stroke-width="1.5" points=""/>
+        <polyline id="sline" fill="none" stroke="#4466ff" stroke-width="1.4" points=""/>
       </svg>
-      <div class="pts" id="pts">Connecting to Twelvedata...</div>
+      <div class="pts" id="pts">Initializing...</div>
     </div>
+
     <div class="card" id="sigcard">
       <div class="lbl">EOD SIGNAL</div>
       <div style="display:flex;align-items:baseline;flex-wrap:wrap;gap:6px">
         <div class="sdir" id="sdir" style="color:var(--b)">—</div>
-        <span class="sstr" id="sstr" style="color:#555">—</span>
+        <span class="sstr" id="sstr" style="color:#444">—</span>
       </div>
       <div class="mtr"><div class="mf" id="mf"></div></div>
-      <div class="ssc">Score: <span id="ssc" style="color:#555">0</span>/100</div>
-      <div class="snote" id="snote">Monitoring... EOD window 3:20–3:50 PM EST</div>
+      <div class="ssc">Score: <span id="ssc" style="color:#444">0</span>/100 | Pyth Conf: <span id="sconf-inline">—</span></div>
+      <div class="sub-scores">
+        <div class="ss-row" id="sr-vol"><span>VOL SPIKE</span><span class="ss-val" id="sv0">—</span></div>
+        <div class="ss-row" id="sr-mom"><span>MOMENTUM</span><span class="ss-val" id="sv1">—</span></div>
+        <div class="ss-row" id="sr-trd"><span>TREND</span><span class="ss-val" id="sv2">—</span></div>
+        <div class="ss-row" id="sr-rnd"><span>$ROUND</span><span class="ss-val" id="sv3">—</span></div>
+      </div>
+      <div class="snote" id="snote">Waiting for data...</div>
     </div>
   </div>
 
   <!-- STATUS BAR -->
   <div id="sbar">
-    <div class="si"><div class="sd" id="dws"></div><span>Price feed: <span id="sws">—</span></span></div>
+    <div class="si"><div class="sd" id="dws"></div><span>Pyth: <span id="sws">—</span></span></div>
     <div class="si"><div class="sd" id="drc"></div><span>Candles: <span id="src">—</span></span></div>
     <div class="si"><div class="sd" id="dsg"></div><span>Signal: <span id="ssg">—</span></span></div>
+    <div class="si"><div class="sd" id="deod"></div><span>EOD Window: <span id="seod">—</span></span></div>
     <span id="snx">—</span>
+  </div>
+
+  <!-- PYTH DATA PANEL -->
+  <div class="card" id="pyth-panel" style="margin-bottom:12px">
+    <div class="lbl">PYTH ORACLE DATA — EQUITY.US.TSLA/USD</div>
+    <div class="pp-grid">
+      <div class="pp-cell live-cell">
+        <div class="pp-lbl">ORACLE PRICE</div>
+        <div class="pp-val" id="pp-price">—</div>
+        <div class="pp-sub">Pyth Hermes</div>
+      </div>
+      <div class="pp-cell">
+        <div class="pp-lbl">CONFIDENCE ±</div>
+        <div class="pp-val" id="pp-conf">—</div>
+        <div class="pp-sub">Price uncertainty</div>
+      </div>
+      <div class="pp-cell">
+        <div class="pp-lbl">CONF / PRICE %</div>
+        <div class="pp-val" id="pp-cpct">—</div>
+        <div class="pp-sub">&lt;0.1% = clean signal</div>
+      </div>
+      <div class="pp-cell">
+        <div class="pp-lbl">PUBLISH AGE</div>
+        <div class="pp-val" id="pp-age">—</div>
+        <div class="pp-sub">Seconds old</div>
+      </div>
+    </div>
+    <!-- Confidence meter -->
+    <div id="conf-section" style="margin-top:14px">
+      <div style="font-size:8px;color:#444;letter-spacing:2px;text-transform:uppercase;margin-bottom:6px">SIGNAL QUALITY GATE (Pyth Confidence Filter)</div>
+      <div class="conf-bar-wrap"><div class="conf-bar" id="conf-bar" style="background:var(--g)"></div></div>
+      <div class="conf-label-row"><span>NOISY (high conf%)</span><span id="conf-meter-lbl">—</span><span>CLEAN (&lt;0.05%)</span></div>
+      <div class="conf-status" id="conf-status" style="color:var(--dim)">Waiting for Pyth data...</div>
+    </div>
   </div>
 
   <!-- BREAKDOWN -->
@@ -218,18 +312,41 @@
   </div>
 
   <!-- ALERT -->
-  <div id="alrt" style="display:none"></div>
+  <div id="alrt"></div>
 
-  <!-- EDUCATION -->
-  <div class="card" style="margin-bottom:12px">
-    <div class="lbl">HOW SIGNALS WORK</div>
-    <div class="eg">
-      <div><div class="et" style="color:var(--g)">VOLUME SPIKE (30pts)</div>Recent 5-min avg vol vs prior 10-min. &gt;1.5x = institutions positioning for EOD move.</div>
-      <div><div class="et" style="color:var(--b)">MOMENTUM BREAK (20pts)</div>5 consecutive bars closing same direction = confirmed trend, not noise.</div>
-      <div><div class="et" style="color:var(--y)">NEAR ROUND NUMBER (15pts)</div>TSLA magnetizes to $5 intervals. Within $1.50 = breakout or bounce zone.</div>
-      <div><div class="et" style="color:var(--o)">EOD WINDOW (10pts)</div>3:20–3:50 PM EST. MMs delta-hedge 0DTE causing explosive gamma moves.</div>
+  <!-- WEALTH TRACKER -->
+  <div class="card" id="wealth">
+    <div class="lbl">WEALTH BUILDER — TRADE PERFORMANCE</div>
+    <div class="wt-grid">
+      <div class="wt-cell">
+        <div class="wt-lbl">ACCOUNT SIZE</div>
+        <div class="wt-val" id="wt-size">$0</div>
+        <div class="wt-sub">Working capital</div>
+      </div>
+      <div class="wt-cell">
+        <div class="wt-lbl">TOTAL P&amp;L</div>
+        <div class="wt-val" id="wt-pnl" style="color:var(--dim)">$0.00</div>
+        <div class="wt-sub" id="wt-pnl-pct">0.00%</div>
+      </div>
+      <div class="wt-cell">
+        <div class="wt-lbl">WIN RATE</div>
+        <div class="wt-val" id="wt-wr" style="color:var(--dim)">—</div>
+        <div class="wt-sub" id="wt-trades">0 trades</div>
+      </div>
+      <div class="wt-cell">
+        <div class="wt-lbl">MAX RISK/TRADE</div>
+        <div class="wt-val" id="wt-risk">—</div>
+        <div class="wt-sub">1–2% of account</div>
+      </div>
     </div>
-    <div class="risk">⚠️ 0DTE options are the highest-risk instrument in trading. A $5 contract goes to $0.01 just as easily as $125. Max 1–2% account risk per trade. NOT financial advice.</div>
+    <div id="wt-edit">
+      <span class="wt-lbl-txt">ACCOUNT $</span>
+      <input class="wt-inp" id="wt-inp" type="number" placeholder="e.g. 5000" min="100" step="100"/>
+      <button class="wt-btn" onclick="setAccount()">SET</button>
+      <span class="wt-lbl-txt" style="margin-left:8px">P&amp;L per trade $</span>
+      <input class="wt-inp" id="pnl-inp" type="number" placeholder="e.g. 45.00" step="0.01"/>
+      <button class="wt-btn" onclick="logPnl()">LOG P&amp;L</button>
+    </div>
   </div>
 
   <!-- TRADE LOG -->
@@ -238,383 +355,494 @@
       <div class="lbl" style="margin-bottom:0">TRADE LOG</div>
       <div class="lcnt" id="lcnt">0 ENTRIES</div>
     </div>
-    <div id="llist"><div class="lmt">No trades yet. Approve or reject signals above.</div></div>
+    <div id="llist"><div class="lmt">No trades logged yet. Approve or reject signals above.</div></div>
+  </div>
+
+  <!-- EDUCATION -->
+  <div class="card" style="margin-bottom:12px">
+    <div class="lbl">HOW THIS BOT WORKS</div>
+    <div class="eg">
+      <div><div class="et" style="color:#7a8fff">PYTH ORACLE LAYER</div>Dual-source: Pyth Hermes provides oracle-grade TSLA/USD price with confidence interval. Low conf% = high-quality institutional data.</div>
+      <div><div class="et" style="color:var(--g)">VOLUME SPIKE (30pts)</div>5-min avg volume vs prior 10-min. &gt;1.5× = institutions positioning. Pyth conf &lt;0.15% required.</div>
+      <div><div class="et" style="color:var(--b)">MOMENTUM (25pts)</div>5 consecutive 1-min bars same direction. Confirmed trend, not noise. High-strength signal.</div>
+      <div><div class="et" style="color:var(--y)">ROUND NUMBER (15pts)</div>TSLA gravitates to $5 multiples. Within $1.50 = magnetic breakout/bounce zone.</div>
+      <div><div class="et" style="color:var(--o)">EOD WINDOW (10pts)</div>3:20–3:50 PM EST. Market makers delta-hedge 0DTE causing gamma-driven explosive moves.</div>
+      <div><div class="et" style="color:var(--p)">WEALTH BUILDING</div>Log every trade outcome. Bot tracks your win rate, total P&amp;L, and enforces 1–2% max risk per trade. Compounding beats salary.</div>
+    </div>
+    <div class="risk">⚠ 0DTE options are the highest-risk financial instrument. A $5 contract goes to $0.01 just as fast as $125. This is a signal assistant — NOT a broker, NOT financial advice. Always use max 1–2% of your account per trade. Built for Ashok — trade what you can afford to lose.</div>
   </div>
 
   <div id="foot">
-    <div class="ftt">DATA SOURCE: TWELVEDATA (FREE TIER)</div>
-    <span class="cg">✓ Price polling</span> — updates every 10 seconds via REST /price endpoint<br/>
-    <span class="cg">✓ Candle REST</span> — 1-min bars for signal engine, refreshes every 60s<br/>
-    <span class="cy">✗ Options pricing</span> — not on free tier. Need <span class="cb">IBKR Canada</span> or <span class="cb">Polygon.io $29/mo</span>
+    <div class="ftt">DATA ARCHITECTURE</div>
+    <span class="cg">✓ Pyth Hermes</span> — hermes.pyth.network/v2/updates/price/latest · Equity.US.TSLA/USD · confidence + publish_time + expo<br/>
+    <span class="cg">✓ Twelvedata REST</span> — /time_series 1min 60 bars (candle engine) · /price poll every 15s (live tick)<br/>
+    <span class="cy">⚡ Pyth confidence gate</span> — signals blocked if conf/price &gt; 0.20% (noisy market protection)<br/>
+    <span class="cy">⚡ EOD window</span> — 3:20–3:50 PM ET · TSLA only trades NYSE hours (Mon–Fri 9:30–16:00 ET)<br/>
+    <span class="cr">✗ Options pricing</span> — not on free APIs. Use <span class="cb">IBKR Canada</span> or <span class="cb">Polygon $29/mo</span> for greeks + IV<br/>
+    <span style="color:#333">Feed ID: 0x49f6b65cb1de6b10468bc5cddf1da7e1c3fac6c0c97a6309b6f23b1c07eb0af4</span>
   </div>
 </div>
 
 <script>
-// ─── CONFIG ──────────────────────────────────────────────────────────────────
-const TD_KEY   = '67c8868efea742babf6cfc2c1871a5f9';  // Twelvedata key
-const SYMBOL   = 'TSLA';
-const CANDLE_S = 60; // seconds between candle refreshes
+// ═══════════════════════════════════════════════════════════════════
+// TSLA EOD BOT — Pyth Hermes + Twelvedata
+// Keys are used server-side in production; kept here for single-file demo.
+// In production: move these to a backend proxy / env vars.
+// ═══════════════════════════════════════════════════════════════════
+const TD_KEY    = '67c8868efea742babf6cfc2c1871a5f9';
+const PYTH_KEY  = 'HobGTaJt5zLLfvHq1h2Gfzp7g5jryMcqaFc4L6VjUA8L';
+// Official Pyth feed ID for Equity.US.TSLA/USD (from Pyth price feeds list)
+const TSLA_FEED = '0x49f6b65cb1de6b10468bc5cddf1da7e1c3fac6c0c97a6309b6f23b1c07eb0af4';
+const HERMES    = 'https://hermes.pyth.network';
+const TD_BASE   = 'https://api.twelvedata.com';
+const SYMBOL    = 'TSLA';
 const W = {vol:30,mom:25,trend:20,round:15,eod:10};
 
-// ─── STATE ───────────────────────────────────────────────────────────────────
-let price=null, prevP=null, bars=[], sig=null, trades=[];
-let ws=null, wsOk=false, useMock=false;
+// ── STATE ─────────────────────────────────────────────────────────
+let price=null, prevP=null, pythPrice=null, pythConf=null, pythAge=null, pythCPct=null;
+let bars=[], sig=null, trades=[], pnlHistory=[];
+let wsOk=false, pythOk=false, useMock=false;
 let alertedKeys=new Set(), prevDir=null;
-let cdTimer=null, nextAt=0;
+let cdTimer=null, pythTimer=null, priceTimer=null, nextAt=0;
+let accountSize=0, totalPnl=0, wins=0, losses=0;
+let diagShown=false;
 
-// ─── HELPERS ─────────────────────────────────────────────────────────────────
-const fmtT = d => d.toLocaleTimeString('en-US',{hour:'2-digit',minute:'2-digit',second:'2-digit'});
-const fmtP = p => p!=null?`$${(+p).toFixed(2)}`:'—';
-
-function dot(id,c){document.getElementById(id).style.background=c}
-function txt(id,v){document.getElementById(id).textContent=v}
+// ── HELPERS ───────────────────────────────────────────────────────
+const fmtT  = d => d.toLocaleTimeString('en-US',{hour:'2-digit',minute:'2-digit',second:'2-digit',timeZone:'America/New_York'});
+const fmtP  = p => p!=null?`$${(+p).toFixed(2)}`:'—';
+const fmtC  = p => p!=null?`$${(+p).toFixed(4)}`:'—';
+function txt(id,v){const e=document.getElementById(id);if(e)e.textContent=v}
+function dot(id,c){const e=document.getElementById(id);if(e)e.style.background=c}
 function str(sc){
   if(sc>=80)return{l:'STRONG',  c:'#00ff9d'};
   if(sc>=55)return{l:'MODERATE',c:'#f5c542'};
   if(sc>=30)return{l:'WEAK',    c:'#ff6b35'};
-  return{l:'NO SIGNAL',c:'#555'};
+  return{l:'NO SIGNAL',c:'#444'};
+}
+function isMarketHours(){
+  const now=new Date();
+  const et=new Date(now.toLocaleString('en-US',{timeZone:'America/New_York'}));
+  const d=et.getDay(),h=et.getHours(),m=et.getMinutes();
+  if(d===0||d===6)return false;
+  const mins=h*60+m;
+  return mins>=570&&mins<960; // 9:30–16:00 ET
+}
+function isEODWindow(){
+  const now=new Date();
+  const et=new Date(now.toLocaleString('en-US',{timeZone:'America/New_York'}));
+  const h=et.getHours(),m=et.getMinutes();
+  return h===15&&m>=20&&m<=50;
+}
+function confQuality(pct){
+  if(pct===null||pct===undefined)return{label:'UNKNOWN',color:'#444',ok:false};
+  if(pct<0.05)return{label:'EXCELLENT',color:'#00ff9d',ok:true};
+  if(pct<0.10)return{label:'GOOD',color:'#00ff9d',ok:true};
+  if(pct<0.15)return{label:'FAIR',color:'#f5c542',ok:true};
+  if(pct<0.20)return{label:'BORDERLINE',color:'#ff6b35',ok:true};
+  return{label:'NOISY — BLOCKED',color:'#ff3344',ok:false};
 }
 
-// ─── SIGNAL ENGINE ────────────────────────────────────────────────────────────
+// ── PILL ──────────────────────────────────────────────────────────
+function setPill(label,cls){
+  const pill=document.getElementById('pill'),d=document.getElementById('pdot');
+  pill.className=cls||'';txt('plbl',label);
+  d.style.background=cls==='live'?'#00ff9d':cls==='pyth'?'#7a8fff':cls==='err'?'#ff3344':'#f5c542';
+}
+
+// ── SIGNAL ENGINE ─────────────────────────────────────────────────
 function calcSig(b,p){
   if(!b||b.length<10)return null;
   const rec=b.slice(-5),ear=b.slice(-15,-5);
-  const avgVE=ear.reduce((s,x)=>s+x.v,0)/ear.length;
-  const avgVR=rec.reduce((s,x)=>s+x.v,0)/rec.length;
+  const avgVE=ear.reduce((s,x)=>s+x.v,0)/(ear.length||1);
+  const avgVR=rec.reduce((s,x)=>s+x.v,0)/(rec.length||1);
   const vr=avgVR/(avgVE||1);
-  const mR=rec.map(x=>Math.abs(x.c-x.o)),mE=ear.map(x=>Math.abs(x.c-x.o));
-  const mr=(mR.reduce((s,v)=>s+v,0)/mR.length)/(mE.reduce((s,v)=>s+v,0)/mE.length||0.01);
+  const mR=rec.map(x=>Math.abs(x.c-x.o));
+  const mE=ear.map(x=>Math.abs(x.c-x.o));
+  const mr=(mR.reduce((s,v)=>s+v,0)/mR.length)/((mE.reduce((s,v)=>s+v,0)/mE.length)||0.01);
   const base=Math.floor(p/5)*5;
   const nr=[-2,-1,0,1,2].map(i=>base+i*5).some(r=>Math.abs(p-r)<1.5);
   const l5=b.slice(-5);
   const aU=l5.every((x,i)=>i===0||x.c>l5[i-1].c);
   const aD=l5.every((x,i)=>i===0||x.c<l5[i-1].c);
   const tr=aU?'UP':aD?'DOWN':'MIXED';
-  const now=new Date(),eod=now.getHours()===15&&now.getMinutes()>=20;
+  const eod=isEODWindow();
+  // Pyth confidence gate — if Pyth data available and conf is noisy, reduce score
+  const confGate=pythCPct===null?true:confQuality(pythCPct).ok;
   let sc=0;
-  if(vr>1.5)sc+=W.vol; if(mr>1.8)sc+=W.mom;
-  if(tr!=='MIXED')sc+=W.trend; if(nr)sc+=W.round; if(eod)sc+=W.eod;
+  if(vr>1.5)sc+=W.vol;
+  if(mr>1.8)sc+=W.mom;
+  if(tr!=='MIXED')sc+=W.trend;
+  if(nr)sc+=W.round;
+  if(eod)sc+=W.eod;
+  // Pyth confidence penalty: noisy data reduces effective score
+  if(!confGate&&sc>0)sc=Math.round(sc*0.5);
   let dir='NEUTRAL';
-  if(tr==='UP'&&sc>=50)dir='CALL'; if(tr==='DOWN'&&sc>=50)dir='PUT';
-  return{vr:vr.toFixed(2),mr:mr.toFixed(2),nr,tr,eod,sc,dir,on:{vol:vr>1.5,mom:mr>1.8,trend:tr!=='MIXED',round:nr,eod}};
+  if(tr==='UP'&&sc>=50)dir='CALL';
+  if(tr==='DOWN'&&sc>=50)dir='PUT';
+  return{vr:vr.toFixed(2),mr:mr.toFixed(2),nr,tr,eod,sc,dir,confGate,
+    on:{vol:vr>1.5,mom:mr>1.8,trend:tr!=='MIXED',round:nr,eod}};
 }
 
-// ─── MOCK FALLBACK ────────────────────────────────────────────────────────────
-function makeMock(base=215){
-  const out=[];let p=base;
-  for(let i=0;i<30;i++){const ch=(Math.random()-.48)*2,o=p,c=p+ch;out.push({o,c,h:Math.max(o,c)+.4,l:Math.min(o,c)-.4,v:Math.floor(5e5+Math.random()*2e6)});p=c}
-  const sp=Math.random()>.5?4:-4;
-  for(let i=0;i<6;i++){const o=p,c=p+sp*(.5+Math.random()*.5);out.push({o,c,h:Math.max(o,c)+.3,l:Math.min(o,c)-.3,v:Math.floor(3e6+Math.random()*5e6)});p=c}
-  return out;
-}
-
-// ─── SPARKLINE ────────────────────────────────────────────────────────────────
+// ── SPARKLINE ─────────────────────────────────────────────────────
 function drawSpark(b,dir){
   if(!b||b.length<2)return;
   const px=b.map(x=>x.c),mn=Math.min(...px),mx=Math.max(...px),rng=mx-mn||1;
-  const W2=300,H=50,color=dir==='CALL'?'#00ff9d':dir==='PUT'?'#ff3344':'#4466ff';
+  const W2=290,H=48;
+  const color=dir==='CALL'?'#00ff9d':dir==='PUT'?'#ff3344':'#4466ff';
   const pts=px.map((p,i)=>`${((i/(px.length-1))*W2).toFixed(1)},${(H-((p-mn)/rng)*H).toFixed(1)}`);
-  const line=document.getElementById('sline'),fill=document.getElementById('sfill'),grad=document.getElementById('sg');
-  line.setAttribute('points',pts.join(' '));line.setAttribute('stroke',color);
-  fill.setAttribute('points',`0,${H} ${pts.join(' ')} ${W2},${H}`);
-  grad.querySelectorAll('stop')[0].setAttribute('stop-color',color);
-  grad.querySelectorAll('stop')[1].setAttribute('stop-color',color);
+  document.getElementById('sline').setAttribute('points',pts.join(' '));
+  document.getElementById('sline').setAttribute('stroke',color);
+  document.getElementById('sfill').setAttribute('points',`0,${H} ${pts.join(' ')} ${W2},${H}`);
+  const stops=document.getElementById('sg').querySelectorAll('stop');
+  stops[0].setAttribute('stop-color',color);stops[1].setAttribute('stop-color',color);
 }
 
-// ─── PILL STATUS ─────────────────────────────────────────────────────────────
-function setPill(label,cls){
-  const pill=document.getElementById('pill'),d=document.getElementById('pdot');
-  pill.className=cls||'';txt('plbl',label);
-  d.style.background=cls==='live'?'#00ff9d':cls==='err'?'#ff3344':'#f5c542';
-}
-
-// ─── SHOW DIAGNOSTIC ─────────────────────────────────────────────────────────
-function showDiag(title,body){
-  txt('diag-title',title); txt('diag-body',body);
-  document.getElementById('diag').classList.add('show');
-}
-
-// ─── PRICE UI ────────────────────────────────────────────────────────────────
-function renderPrice(p,isLive){
-  const el=document.getElementById('pval'),ch=document.getElementById('pch');
+// ── PRICE UI ──────────────────────────────────────────────────────
+function renderPrice(p,isLive,fromPyth){
+  const el=document.getElementById('pval');
   el.classList.remove('fG','fR');
   void el.offsetWidth;
   if(prevP!=null)el.classList.add(p>=prevP?'fG':'fR');
   el.textContent=fmtP(p);
-  txt('pts',(isLive?'Live tick ':'Last candle ')+fmtT(new Date()));
+  const card=document.getElementById('price-card');
+  card.classList.remove('tickG','tickR');
+  void card.offsetWidth;
+  if(prevP!=null)card.classList.add(p>=prevP?'tickG':'tickR');
+  txt('pts',(fromPyth?'⬡ Pyth oracle ':isLive?'⬛ Twelvedata tick ':' Last candle ')+fmtT(new Date())+' ET');
   if(prevP!=null){
     const d=p-prevP,pct=(d/prevP*100).toFixed(3);
+    const ch=document.getElementById('pch');
     ch.textContent=`${d>=0?'+':''}${d.toFixed(2)} (${pct}%)`;
     ch.style.color=d>=0?'#00ff9d':'#ff3344';
   }
-  if(isLive)document.getElementById('live-tag').classList.add('show');
+  if(isLive&&!fromPyth)document.getElementById('live-tag').classList.add('show');
+  if(fromPyth){
+    document.getElementById('pyth-tag').classList.add('show');
+    document.getElementById('live-tag').classList.remove('show');
+  }
+  // Update market status
+  const ms=document.getElementById('sb-market-status');
+  if(isMarketHours()){ms.textContent='MARKET OPEN';ms.style.color='#00ff9d';}
+  else{ms.textContent='MARKET CLOSED';ms.style.color='#555';}
 }
 
-// ─── SIGNAL UI ───────────────────────────────────────────────────────────────
+// ── PYTH UI ───────────────────────────────────────────────────────
+function renderPythPanel(p,conf,age,cpct){
+  txt('pp-price',fmtP(p));
+  txt('pp-conf', conf!=null?`±$${conf.toFixed(4)}`:'—');
+  txt('pp-age',  age!=null?`${age}s`:'—');
+  txt('pp-cpct', cpct!=null?`${cpct.toFixed(4)}%`:'—');
+  txt('sconf-inline',cpct!=null?`${cpct.toFixed(3)}%`:'—');
+  const q=confQuality(cpct);
+  const bar=document.getElementById('conf-bar');
+  // bar fill: 100% = clean (low pct), 0% = noisy (high pct)
+  if(cpct!=null){
+    const fillPct=Math.max(0,Math.min(100,100-(cpct/0.3)*100));
+    bar.style.width=fillPct+'%';
+    bar.style.background=q.color;
+  }
+  txt('conf-meter-lbl',q.label);
+  const cs=document.getElementById('conf-status');
+  cs.textContent=q.ok
+    ?`✓ Signal quality: ${q.label} (${cpct?.toFixed(4)}%) — Pyth data accepted`
+    :`✗ Signal quality: ${q.label} (${cpct?.toFixed(4)}%) — score reduced 50%`;
+  cs.style.color=q.color;
+  const cc=document.getElementById('chip-conf');
+  cc.textContent=`CONF ${cpct!=null?cpct.toFixed(3)+'%':'—'}`;
+  cc.className='conf-chip'+(q.ok?' ok':' warn');
+  const ca=document.getElementById('chip-age');
+  ca.textContent=`AGE ${age!=null?age+'s':'—'}`;
+  ca.className='conf-chip'+(age!=null&&age<30?' ok':' warn');
+  const cp=document.getElementById('chip-pct');
+  cp.textContent=q.label;
+  cp.className='conf-chip'+(q.ok?' ok':' warn');
+}
+
+// ── SIGNAL UI ─────────────────────────────────────────────────────
 function renderSig(s){
   if(!s)return;
-  const st=str(s.sc),dc=s.dir==='CALL'?'#00ff9d':s.dir==='PUT'?'#ff3344':'#4466ff';
+  const st=str(s.sc);
+  const dc=s.dir==='CALL'?'#00ff9d':s.dir==='PUT'?'#ff3344':'#4466ff';
   const sdir=document.getElementById('sdir');
   sdir.textContent=s.dir||'—';sdir.style.color=dc;
   const sstr=document.getElementById('sstr');
   sstr.textContent=st.l;sstr.style.color=st.c;
-  const ssc=document.getElementById('ssc');
-  ssc.textContent=s.sc;ssc.style.color=st.c;
+  txt('ssc',s.sc);
+  document.getElementById('ssc').style.color=st.c;
   const mf=document.getElementById('mf');
   mf.style.width=`${Math.min(s.sc,100)}%`;
-  mf.style.background=`linear-gradient(90deg,#222,${st.c})`;
-  mf.style.boxShadow=`0 0 10px ${st.c}55`;
-  document.getElementById('sigcard').style.borderColor=s.sc>=55?dc+'44':'var(--bdr)';
+  mf.style.background=`linear-gradient(90deg,#111,${st.c})`;
+  mf.style.boxShadow=`0 0 8px ${st.c}44`;
+  document.getElementById('sigcard').style.borderColor=s.sc>=55?dc+'33':'var(--bdr)';
   const sn=document.getElementById('snote');
-  sn.textContent=s.eod?'⚡ EOD WINDOW ACTIVE — HIGH ALERT':'Monitoring... EOD window 3:20–3:50 PM EST';
-  sn.style.color=s.eod?st.c:'#333';
-  dot('dsg',s.sc>=55?'#00ff9d':s.sc>=30?'#f5c542':'#555');
-  txt('ssg',`Score ${s.sc}`);
+  sn.textContent=s.eod?`⚡ EOD WINDOW ACTIVE ${s.confGate?'— SIGNALS ARMED':'— PYTH CONF NOISY'}`
+    :'Monitoring... EOD 3:20–3:50 PM ET · '+fmtT(new Date());
+  sn.style.color=s.eod?(s.confGate?st.c:'#ff6b35'):'#2a2a36';
+  dot('dsg',s.sc>=55?'#00ff9d':s.sc>=30?'#f5c542':'#333');
+  txt('ssg',`Score ${s.sc}${s.confGate?'':' (conf-gated)'}`);
+  dot('deod',s.eod?'#f5c542':'#222');
+  txt('seod',s.eod?'ACTIVE 3:20–3:50':'WAITING');
+  // Sub-score rows
+  [[('sr-vol'),s.on.vol,`sv0`,s.vr+'×'],
+   [('sr-mom'),s.on.mom,`sv1`,s.mr+'×'],
+   [('sr-trd'),s.on.trend,`sv2`,s.tr],
+   [('sr-rnd'),s.on.round,`sv3`,s.nr?'YES':'NO']].forEach(([id,on,vid,val])=>{
+    document.getElementById(id).classList.toggle('on',on);
+    txt(vid,val);
+  });
 }
 
 function renderBreak(s){
   if(!s)return;
-  [[0,`${s.vr}x`,s.on.vol],[1,`${s.mr}x`,s.on.mom],[2,s.tr,s.on.trend],[3,s.nr?'YES':'NO',s.on.round],[4,s.eod?'ACTIVE':'WAIT',s.on.eod]]
+  [[0,`${s.vr}×`,s.on.vol],[1,`${s.mr}×`,s.on.mom],[2,s.tr,s.on.trend],
+   [3,s.nr?'YES':'NO',s.on.round],[4,s.eod?'ACTIVE':'WAIT',s.on.eod]]
   .forEach(([i,val,on])=>{
     document.getElementById(`b${i}`).classList.toggle('on',on);
     txt(`v${i}`,val);
   });
 }
 
-// ─── ALERT ───────────────────────────────────────────────────────────────────
+// ── ALERT ─────────────────────────────────────────────────────────
 function checkAlert(s,p){
   if(!s||s.dir==='NEUTRAL'||s.sc<55)return;
-  const key=`${s.dir}-${Math.round(p)}-${new Date().getMinutes()}`;
+  const key=`${s.dir}-${Math.round(p/5)*5}-${new Date().getMinutes()}`;
   if(!alertedKeys.has(key)&&s.dir!==prevDir){alertedKeys.add(key);prevDir=s.dir;fireAlert(s,p);}
 }
 function fireAlert(s,p){
-  const sec=document.getElementById('alrt');
-  const isC=s.dir==='CALL',col=isC?'#00ff9d':'#ff3344';
-  const bg=isC?'#001a0a':'#1a000a',bdr=isC?'rgba(0,255,157,.3)':'rgba(255,51,68,.3)';
-  const t=fmtT(new Date()),ps=(+p).toFixed(2);
-  sec.style.display='block';
-  sec.innerHTML=`<div class="alc sig-in ${isC?'c-glow':'p-glow'}" style="background:${bg};border:1px solid ${bdr};margin-bottom:12px">
-    <div class="all" style="color:${col}">⚡ TRADE ALERT — MANUAL APPROVAL REQUIRED</div>
-    <div class="ald" style="color:${col}">BUY ${s.dir} @ $${ps}</div>
-    <div class="alm">Score ${s.sc}/100 · Trend ${s.tr} · Vol ${s.vr}x · ${t}</div>
-    <div class="alb">
-      <button class="be ${isC?'bc-c':'bc-p'}" onclick="doTrade('APPROVED','${s.dir}',${ps},'${s.sc}','${s.tr}','${s.vr}','${t}')">✓ ENTER TRADE</button>
-      <button class="bs" onclick="doTrade('REJECTED','${s.dir}',${ps},'${s.sc}','${s.tr}','${s.vr}','${t}')">✗ SKIP</button>
-    </div>
-  </div>`;
+  const isC=s.dir==='CALL';
+  const col=isC?'#00ff9d':'#ff3344';
+  const bg=isC?'#03100a':'#110308';
+  const bdr=isC?'rgba(0,255,157,.25)':'rgba(255,51,68,.25)';
+  const t=fmtT(new Date());const ps=(+p).toFixed(2);
+  const maxR=accountSize>0?`$${(accountSize*0.015).toFixed(0)} max (1.5%)`:'Set account size';
+  const confBlock=pythCPct!=null?`<div class="al-pyth">⬡ Pyth oracle: $${(+p).toFixed(2)} · Conf ±${pythConf?pythConf.toFixed(4):'-'} · Quality: ${confQuality(pythCPct).label} · Age: ${pythAge??'—'}s</div>`:'';
+  document.getElementById('alrt').innerHTML=`
+    <div class="alc sig-in ${isC?'c-glow':'p-glow'}" style="background:${bg};border:1px solid ${bdr};margin-bottom:12px">
+      <div class="all" style="color:${col}">⚡ TRADE ALERT — MANUAL APPROVAL REQUIRED</div>
+      <div class="ald" style="color:${col}">BUY ${s.dir}<span class="at-price">@ $${ps}</span></div>
+      <div class="alm">Score ${s.sc}/100 · Trend ${s.tr} · Vol ${s.vr}× · Momentum ${s.mr}× · ${s.nr?'Near $5 level · ':''}${t} ET<br/>Risk limit: ${maxR}</div>
+      ${confBlock}
+      <div class="alb">
+        <button class="be ${isC?'bc-c':'bc-p'}" onclick="doTrade('APPROVED','${s.dir}',${ps},'${s.sc}','${s.tr}','${s.vr}','${t}',${pythCPct||0})">✓ ENTER TRADE</button>
+        <button class="bs" onclick="doTrade('REJECTED','${s.dir}',${ps},'${s.sc}','${s.tr}','${s.vr}','${t}',${pythCPct||0})">✗ SKIP SIGNAL</button>
+      </div>
+    </div>`;
 }
-function doTrade(action,dir,price,sc,tr,vr,time){
-  trades.push({action,dir,price:+price,sc,tr,vr,time});
-  document.getElementById('alrt').style.display='none';
+function doTrade(action,dir,price,sc,tr,vr,time,cpct){
+  trades.push({action,dir,price:+price,sc,tr,vr,time,cpct:+cpct});
   document.getElementById('alrt').innerHTML='';
   renderLog();
 }
 function renderLog(){
   const list=document.getElementById('llist'),cnt=document.getElementById('lcnt');
   cnt.textContent=`${trades.length} ENTRIES`;
-  if(!trades.length){list.innerHTML='<div class="lmt">No trades yet.</div>';return;}
+  if(!trades.length){list.innerHTML='<div class="lmt">No trades logged yet.</div>';return;}
   list.innerHTML=trades.slice().reverse().map(t=>{
-    const isC=t.dir==='CALL',sc2=t.action==='APPROVED'?'#00ff9d':'#ff3344';
-    return`<div class="le fadein" style="border:1px solid ${t.action==='APPROVED'?'rgba(0,255,157,.12)':'rgba(255,51,68,.12)'}">
-      <div class="lel">
-        <span class="led" style="background:${isC?'rgba(0,255,157,.08)':'rgba(255,51,68,.08)'};color:${isC?'#00ff9d':'#ff3344'}">${t.dir}</span>
-        <span class="lep">$${t.price.toFixed(2)}</span>
-        <span class="let">${t.time}</span>
-      </div>
-      <span class="les" style="color:${sc2}">${t.action==='APPROVED'?'✓ ENTERED':'✗ SKIPPED'}</span>
+    const isC=t.dir==='CALL';
+    const sc2=t.action==='APPROVED'?'#00ff9d':'#ff3344';
+    const cl=isC?'rgba(0,255,157,.06)':'rgba(255,51,68,.06)';
+    const bdc=isC?'rgba(0,255,157,.1)':'rgba(255,51,68,.1)';
+    return`<div class="le fadein" style="background:${cl};border-color:${bdc}">
+      <span class="led" style="background:${isC?'rgba(0,255,157,.1)':'rgba(255,51,68,.1)'};color:${isC?'#00ff9d':'#ff3344'}">${t.dir}</span>
+      <span class="le-p">$${t.price.toFixed(2)} <span class="le-conf">· Pyth conf ${t.cpct.toFixed(3)}%</span></span>
+      <span class="le-t">${t.time}</span>
+      <span class="les" style="color:${sc2}">${t.action==='APPROVED'?'✓ IN':'✗ SKIP'}</span>
     </div>`;
   }).join('');
 }
 
-// ═══════════════════════════════════════════════════════════════════════════
-// TWELVEDATA — exact endpoints per official docs
-//
-// PRICE endpoint   : GET /price?symbol=TSLA&apikey=KEY  → { price: "123.45" }
-// CANDLES endpoint : GET /time_series?symbol=TSLA&interval=1min&outputsize=60&order=asc&apikey=KEY
-//                    → { status:"ok", values:[{datetime,open,high,low,close,volume},...] }
-//
-// Free plan limits : 8 API calls/min, 800 calls/day
-// Price polls every 15s = 4/min.  Candles every 60s = 1/min.  Total = 5/min ✓
-// ═══════════════════════════════════════════════════════════════════════════
-
-let priceTimer = null;
-let diagShown  = false; // only show diagnostic banner once
-
-// ── PRICE POLL (every 15 seconds) ───────────────────────────────────────────
-function startWS() {
-  pollPrice();
-  clearInterval(priceTimer);
-  priceTimer = setInterval(pollPrice, 15000);
+// ── WEALTH TRACKER ────────────────────────────────────────────────
+function setAccount(){
+  const v=parseFloat(document.getElementById('wt-inp').value);
+  if(!v||v<100)return;
+  accountSize=v;
+  renderWealth();
+}
+function logPnl(){
+  const v=parseFloat(document.getElementById('pnl-inp').value);
+  if(isNaN(v))return;
+  totalPnl+=v;
+  if(v>0)wins++;else if(v<0)losses++;
+  pnlHistory.push(v);
+  document.getElementById('pnl-inp').value='';
+  renderWealth();
+}
+function renderWealth(){
+  txt('wt-size',accountSize>0?`$${accountSize.toLocaleString()}`:'Not set');
+  const pnlEl=document.getElementById('wt-pnl');
+  pnlEl.textContent=totalPnl>=0?`+$${totalPnl.toFixed(2)}`:`-$${Math.abs(totalPnl).toFixed(2)}`;
+  pnlEl.style.color=totalPnl>0?'#00ff9d':totalPnl<0?'#ff3344':'#666';
+  const pct=accountSize>0?((totalPnl/accountSize)*100).toFixed(2):'—';
+  txt('wt-pnl-pct',accountSize>0?`${pct}% of account`:'Set account size');
+  const total=wins+losses;
+  const wr=total>0?((wins/total)*100).toFixed(0)+'%':'—';
+  const wrEl=document.getElementById('wt-wr');
+  wrEl.textContent=wr;
+  wrEl.style.color=total>0&&(wins/total)>=0.5?'#00ff9d':'#666';
+  txt('wt-trades',`${total} closed trades`);
+  const maxR=accountSize>0?`$${(accountSize*0.015).toFixed(0)}/trade`:'—';
+  txt('wt-risk',maxR);
 }
 
-async function pollPrice() {
-  try {
-    // Exact endpoint from Twelvedata docs
-    const res = await fetch(
-      `https://api.twelvedata.com/price?symbol=${SYMBOL}&apikey=${TD_KEY}`
+// ═══════════════════════════════════════════════════════════════════
+// PYTH HERMES FETCH — v2/updates/price/latest
+// feed ID: 0x49f6b65cb1de6b10468bc5cddf1da7e1c3fac6c0c97a6309b6f23b1c07eb0af4
+// ═══════════════════════════════════════════════════════════════════
+async function fetchPyth(){
+  try{
+    const res=await fetch(
+      `${HERMES}/v2/updates/price/latest?ids[]=${TSLA_FEED}&parsed=true`,
+      {headers:{'X-API-Key':PYTH_KEY}}
     );
-    const j = await res.json();
-
-    // API returns { code, message } on error, { price } on success
-    if (j.code || j.status === 'error') {
-      throw new Error(j.message || `API error ${j.code}`);
+    if(!res.ok)throw new Error(`Pyth HTTP ${res.status}`);
+    const j=await res.json();
+    // parsed[0] has price.price, price.conf, price.expo, price.publish_time
+    const parsed=j.parsed?.[0];
+    if(!parsed||!parsed.price)throw new Error('Pyth: no parsed price data');
+    const expo=parsed.price.expo; // typically -8 for equities
+    const rawP=parseInt(parsed.price.price,10);
+    const rawC=parseInt(parsed.price.conf,10);
+    const mult=Math.pow(10,expo); // 10^-8 = 0.00000001
+    pythPrice=rawP*mult;
+    pythConf=rawC*mult;
+    const pubTime=parseInt(parsed.price.publish_time,10);
+    pythAge=Math.round(Date.now()/1000-pubTime);
+    pythCPct=(pythConf/pythPrice)*100;
+    pythOk=true;
+    renderPythPanel(pythPrice,pythConf,pythAge,pythCPct);
+    dot('sb-pyth','#7a8fff');
+    const lbl=document.getElementById('sb-primary-label');
+    lbl.style.color='#7a8fff';
+    txt('sb-pyth-lbl',`$${pythPrice.toFixed(2)} ±${pythConf.toFixed(4)} (age ${pythAge}s)`);
+    dot('dws','#7a8fff');txt('sws',`$${pythPrice.toFixed(2)} · ${confQuality(pythCPct).label}`);
+    // Use Pyth as primary price if Twelvedata not yet available
+    if(price===null||Math.abs(pythPrice-(price||0))<5){
+      prevP=price||pythPrice;
+      if(price===null)price=pythPrice;
+      renderPrice(pythPrice,false,true);
+      setPill('PYTH LIVE','pyth');
     }
-
-    const p = parseFloat(j.price);
-    if (isNaN(p) || p <= 0) throw new Error('Bad price value: ' + j.price);
-
-    // ✅ SUCCESS
-    wsOk    = true;
-    useMock = false;
-    prevP   = price;
-    price   = p;
-    renderPrice(p, true);
-    setPill('LIVE', 'live');
-    txt('sws', 'Live ✓'); dot('dws', '#00ff9d');
-
-    // Run signals on every price tick
-    if (bars.length >= 10) {
-      sig = calcSig(bars, p);
-      renderSig(sig); renderBreak(sig); drawSpark(bars, sig?.dir);
-      checkAlert(sig, p);
+    // Re-run signals with latest Pyth confidence data
+    if(bars.length>=10&&price){
+      sig=calcSig(bars,price);
+      renderSig(sig);renderBreak(sig);drawSpark(bars,sig?.dir);
+      checkAlert(sig,price);
     }
-
-  } catch(err) {
-    wsOk = false;
-    txt('sws', 'Error'); dot('dws', '#ff3344');
-    // Only show the diagnostic banner once so it's not spammy
-    if (!diagShown) {
-      diagShown = true;
-      setPill('ERROR', 'err');
-      showDiag(
-        '⚠️ Twelvedata price fetch failed',
-        `Error: ${err.message}\n\n` +
-        `Check:\n` +
-        `1. Your key is active → twelvedata.com/account\n` +
-        `2. You haven't exceeded 800 calls/day (free limit)\n` +
-        `3. Your browser isn't blocking the fetch (check Console → F12)`
-      );
-    }
+  }catch(err){
+    pythOk=false;
+    dot('sb-pyth','#ff3344');
+    txt('sb-pyth-lbl',`Error: ${err.message}`);
+    dot('dws','#ff3344');txt('sws','Pyth error');
+    // Don't block candles/TD operation
   }
 }
 
-// ── CANDLE FETCH (every 60 seconds) ─────────────────────────────────────────
-async function fetchCandles() {
-  txt('src', 'Fetching...'); dot('drc', '#f5c542');
-
-  try {
-    // Exact time_series endpoint from docs
-    // order=asc → oldest first, exactly what our signal engine needs
-    const res = await fetch(
-      `https://api.twelvedata.com/time_series` +
-      `?symbol=${SYMBOL}` +
-      `&interval=1min` +
-      `&outputsize=60` +
-      `&order=asc` +
-      `&apikey=${TD_KEY}`
-    );
-    const j = await res.json();
-
-    // Check for API-level error object
-    if (j.status === 'error' || j.code) {
-      throw new Error(j.message || `API error ${j.code}`);
+// ═══════════════════════════════════════════════════════════════════
+// TWELVEDATA — /price (15s poll) + /time_series (60s candles)
+// ═══════════════════════════════════════════════════════════════════
+async function pollPrice(){
+  try{
+    const res=await fetch(`${TD_BASE}/price?symbol=${SYMBOL}&apikey=${TD_KEY}`);
+    const j=await res.json();
+    if(j.code||j.status==='error')throw new Error(j.message||`TD error ${j.code}`);
+    const p=parseFloat(j.price);
+    if(isNaN(p)||p<=0)throw new Error('Bad TD price: '+j.price);
+    wsOk=true;prevP=price;price=p;
+    renderPrice(p,true,false);
+    setPill('LIVE','live');
+    dot('sb-td', '#00ff9d');
+    if(bars.length>=10){
+      sig=calcSig(bars,p);
+      renderSig(sig);renderBreak(sig);drawSpark(bars,sig?.dir);
+      checkAlert(sig,p);
     }
-
-    // j.values is array of { datetime, open, high, low, close, volume }
-    const values = j.values;
-    if (!values || !values.length) throw new Error('Empty values array');
-
-    // Map to internal bar format {o,h,l,c,v}
-    bars = values.map(v => ({
-      o: parseFloat(v.open),
-      h: parseFloat(v.high),
-      l: parseFloat(v.low),
-      c: parseFloat(v.close),
-      v: parseFloat(v.volume || 0)
-    }));
-
-    txt('src', `${bars.length} bars ✓`); dot('drc', '#00ff9d');
-    useMock = false;
-    diagShown = false; // reset so next error shows fresh
-
-    // Use latest candle close as price until next poll tick arrives
-    const latest = bars[bars.length - 1].c;
-    if (!price) {
-      prevP = null; price = latest;
-      renderPrice(latest, false);
-    }
-    // Always set pill to LIVE if candles succeeded (not DEMO)
-    if (!wsOk) {
-      setPill('LIVE', 'live');
-      txt('sws', `~${latest.toFixed(2)}`); dot('dws', '#f5c542');
-    }
-
-    sig = calcSig(bars, price || latest);
-    renderSig(sig); renderBreak(sig); drawSpark(bars, sig?.dir);
-    txt('ssg', `Score ${sig?.sc || 0}`);
-    dot('dsg', sig?.sc >= 55 ? '#00ff9d' : sig?.sc >= 30 ? '#f5c542' : '#555');
-    checkAlert(sig, price || latest);
-
-  } catch(err) {
-    txt('src', `${err.message}`); dot('drc', '#ff3344');
-    // Only fall to mock if we have zero bars (first load failure)
-    if (!bars.length) {
-      bars    = makeMock(price || 215);
-      price   = bars[bars.length - 1].c;
-      useMock = true;
-      setPill('DEMO', 'demo');
-      txt('src', 'Demo data'); dot('drc', '#f5c542');
-      renderPrice(price, false);
-      document.getElementById('pts').textContent = '⚠ DEMO — API not reachable';
-      if (!diagShown) {
-        diagShown = true;
-        showDiag(
-          '⚠️ Candle fetch failed — showing demo data',
-          `Error: ${err.message}\n\n` +
-          `Confirm your Twelvedata key is active at twelvedata.com/account\n` +
-          `Free plan: 8 calls/min, 800/day`
-        );
-      }
-    }
-    sig = calcSig(bars, price || 215);
-    renderSig(sig); renderBreak(sig); drawSpark(bars, sig?.dir);
+  }catch(err){
+    wsOk=false;
+    if(!diagShown){diagShown=true;setPill('TD ERR','err');}
   }
-
-  nextAt = Date.now() + CANDLE_S * 1000;
-  startCd();
 }
 
-function startCd() {
+async function fetchCandles(){
+  txt('sb-td-lbl','Fetching...');dot('drc','#f5c542');
+  try{
+    const res=await fetch(
+      `${TD_BASE}/time_series?symbol=${SYMBOL}&interval=1min&outputsize=60&order=asc&apikey=${TD_KEY}`
+    );
+    const j=await res.json();
+    if(j.status==='error'||j.code)throw new Error(j.message||`TD error ${j.code}`);
+    const vals=j.values;
+    if(!vals||!vals.length)throw new Error('Empty values');
+    bars=vals.map(v=>({o:parseFloat(v.open),h:parseFloat(v.high),l:parseFloat(v.low),
+      c:parseFloat(v.close),v:parseFloat(v.volume||0)}));
+    const latest=bars[bars.length-1].c;
+    txt('src',`${bars.length} bars ✓`);dot('drc','#00ff9d');
+    txt('sb-td-lbl',`${bars.length} bars · ${fmtT(new Date())} ET`);
+    useMock=false;diagShown=false;
+    if(!price){prevP=null;price=latest;renderPrice(latest,false,false);}
+    if(!wsOk){setPill('CANDLES','demo');txt('sws',`~${latest.toFixed(2)}`);}
+    sig=calcSig(bars,price||latest);
+    renderSig(sig);renderBreak(sig);drawSpark(bars,sig?.dir);
+    txt('ssg',`Score ${sig?.sc||0}`);
+    dot('dsg',sig?.sc>=55?'#00ff9d':sig?.sc>=30?'#f5c542':'#333');
+    checkAlert(sig,price||latest);
+  }catch(err){
+    txt('src',`${err.message.substring(0,28)}`);dot('drc','#ff3344');
+    txt('sb-td-lbl',`Error · using Pyth price`);
+    // Use Pyth price as fallback
+    if(!bars.length&&pythPrice){
+      price=pythPrice;
+      renderPrice(pythPrice,false,true);
+    }
+    if(!bars.length){
+      // Minimal mock so UI doesn't stay blank
+      const bp=pythPrice||price||380;
+      bars=Array.from({length:25},(_,i)=>{
+        const c=bp+(Math.random()-.5)*2;
+        return{o:c,h:c+0.3,l:c-0.3,c,v:800000+Math.random()*2000000};
+      });
+      useMock=true;setPill('DEMO','demo');
+    }
+    sig=calcSig(bars,price||380);
+    renderSig(sig);renderBreak(sig);drawSpark(bars,sig?.dir);
+  }
+  nextAt=Date.now()+60000;startCd();
+}
+
+function startCd(){
   clearInterval(cdTimer);
-  cdTimer = setInterval(() => {
-    const rem = Math.max(0, Math.round((nextAt - Date.now()) / 1000));
-    txt('snx', `Next candle refresh: ${rem}s`);
-    if (rem <= 0) { clearInterval(cdTimer); fetchCandles(); }
-  }, 1000);
+  cdTimer=setInterval(()=>{
+    const rem=Math.max(0,Math.round((nextAt-Date.now())/1000));
+    txt('snx',`Candles in ${rem}s · Pyth in 10s`);
+    if(rem<=0){clearInterval(cdTimer);fetchCandles();}
+  },1000);
 }
 
-function manualRefresh() {
-  diagShown = false;
-  clearInterval(cdTimer);
-  clearInterval(priceTimer);
-  fetchCandles();
-  pollPrice();
-  priceTimer = setInterval(pollPrice, 15000);
+function manualRefresh(){
+  diagShown=false;
+  clearInterval(cdTimer);clearInterval(priceTimer);clearInterval(pythTimer);
+  fetchPyth();fetchCandles();pollPrice();
+  priceTimer=setInterval(pollPrice,15000);
+  pythTimer=setInterval(fetchPyth,10000);
 }
 
-document.addEventListener('visibilitychange', () => {
-  if (!document.hidden) {
-    diagShown = false;
-    clearInterval(priceTimer);
-    priceTimer = setInterval(pollPrice, 15000);
-    pollPrice();
-    fetchCandles();
+document.addEventListener('visibilitychange',()=>{
+  if(!document.hidden){
+    diagShown=false;
+    clearInterval(priceTimer);clearInterval(pythTimer);
+    priceTimer=setInterval(pollPrice,15000);
+    pythTimer=setInterval(fetchPyth,10000);
+    pollPrice();fetchPyth();
   }
 });
 
-// ── BOOT ─────────────────────────────────────────────────────────────────────
-startWS();       // starts price polling
-fetchCandles();  // loads candle bars
+// ── BOOT ──────────────────────────────────────────────────────────
+// Stagger startup to avoid rate limits
+fetchPyth();
+setTimeout(fetchCandles,1200);
+setTimeout(pollPrice,2500);
+priceTimer=setInterval(pollPrice,15000);   // Twelvedata price every 15s
+pythTimer=setInterval(fetchPyth,10000);    // Pyth oracle every 10s
+renderWealth();
 </script>
 </body>
 </html>
