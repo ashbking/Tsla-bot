@@ -379,7 +379,7 @@
     <span class="cy">⚡ Pyth confidence gate</span> — signals blocked if conf/price &gt; 0.20% (noisy market protection)<br/>
     <span class="cy">⚡ EOD window</span> — 3:20–3:50 PM ET · TSLA only trades NYSE hours (Mon–Fri 9:30–16:00 ET)<br/>
     <span class="cr">✗ Options pricing</span> — not on free APIs. Use <span class="cb">IBKR Canada</span> or <span class="cb">Polygon $29/mo</span> for greeks + IV<br/>
-    <span style="color:#333">Feed ID: 0x49f6b65cb1de6b10468bc5cddf1da7e1c3fac6c0c97a6309b6f23b1c07eb0af4</span>
+    <span style="color:#333">Feed ID: 0x16dad69d4a4a6f0e2d5e3a91fd37df73fb462d6f60fde5e08d59b197e6e732f1</span>
   </div>
 </div>
 
@@ -391,9 +391,7 @@
 // ═══════════════════════════════════════════════════════════════════
 const TD_KEY    = '67c8868efea742babf6cfc2c1871a5f9';
 const PYTH_KEY  = 'HobGTaJt5zLLfvHq1h2Gfzp7g5jryMcqaFc4L6VjUA8L';
-// Official Pyth feed ID for Equity.US.TSLA/USD (from Pyth price feeds list)
-const TSLA_FEED = '0x49f6b65cb1de6b10468bc5cddf1da7e1c3fac6c0c97a6309b6f23b1c07eb0af4';
-const HERMES    = 'https://hermes.pyth.network';
+const LAZER_URL = 'https://pyth-lazer.dourolabs.app/v1/latest_price';
 const TD_BASE   = 'https://api.twelvedata.com';
 const SYMBOL    = 'TSLA';
 const W = {vol:30,mom:25,trend:20,round:15,eod:10};
@@ -685,36 +683,58 @@ function renderWealth(){
 }
 
 // ═══════════════════════════════════════════════════════════════════
-// PYTH HERMES FETCH — v2/updates/price/latest
-// feed ID: 0x49f6b65cb1de6b10468bc5cddf1da7e1c3fac6c0c97a6309b6f23b1c07eb0af4
+// PYTH LAZER — POST /v1/latest_price
+// Response: { parsed: { timestampUs, priceFeeds: [{ priceFeedId, price, exponent }] } }
+// Price in USD = parseInt(price) * 10^exponent
 // ═══════════════════════════════════════════════════════════════════
 async function fetchPyth(){
   try{
-    const res=await fetch(
-      `${HERMES}/v2/updates/price/latest?ids[]=${TSLA_FEED}&parsed=true`,
-      {headers:{'X-API-Key':PYTH_KEY}}
-    );
-    if(!res.ok)throw new Error(`Pyth HTTP ${res.status}`);
+    const res=await fetch('https://pyth-lazer.dourolabs.app/v1/latest_price',{
+      method:'POST',
+      headers:{
+        'Authorization':'Bearer HobGTaJt5zLLfvHq1h2Gfzp7g5jryMcqaFc4L6VjUA8L',
+        'Content-Type':'application/json'
+      },
+      body:JSON.stringify({
+        channel:'real_time',
+        formats:['evm'],
+        properties:['price'],
+        symbols:['Equity.US.TSLA/USD'],
+        parsed:true,
+        jsonBinaryEncoding:'hex'
+      })
+    });
+    if(!res.ok)throw new Error(`Pyth Lazer HTTP ${res.status}`);
     const j=await res.json();
-    // parsed[0] has price.price, price.conf, price.expo, price.publish_time
-    const parsed=j.parsed?.[0];
-    if(!parsed||!parsed.price)throw new Error('Pyth: no parsed price data');
-    const expo=parsed.price.expo; // typically -8 for equities
-    const rawP=parseInt(parsed.price.price,10);
-    const rawC=parseInt(parsed.price.conf,10);
-    const mult=Math.pow(10,expo); // 10^-8 = 0.00000001
-    pythPrice=rawP*mult;
-    pythConf=rawC*mult;
-    const pubTime=parseInt(parsed.price.publish_time,10);
-    pythAge=Math.round(Date.now()/1000-pubTime);
-    pythCPct=(pythConf/pythPrice)*100;
-    pythOk=true;
-    renderPythPanel(pythPrice,pythConf,pythAge,pythCPct);
+
+    // Response structure: j.parsed.priceFeeds[0].price + j.parsed.priceFeeds[0].exponent
+    const feed=j?.parsed?.priceFeeds?.[0];
+    if(!feed)throw new Error('No priceFeeds in Lazer response');
+
+    const rawP  = parseInt(feed.price, 10);
+    const expo  = feed.exponent ?? -5;          // TSLA equity uses -5
+    const mult  = Math.pow(10, expo);
+    pythPrice   = rawP * mult;
+
+    // Lazer confidence: use bestBid/bestAsk spread if available, else small default
+    const bid   = feed.bestBidPrice ? parseInt(feed.bestBidPrice,10)*mult : null;
+    const ask   = feed.bestAskPrice ? parseInt(feed.bestAskPrice,10)*mult : null;
+    pythConf    = (bid && ask) ? (ask - bid) / 2 : pythPrice * 0.0001;
+    pythCPct    = (pythConf / pythPrice) * 100;
+
+    // Timestamp: timestampUs is microseconds
+    const tsUs  = parseInt(j?.parsed?.timestampUs || '0', 10);
+    pythAge     = tsUs ? Math.round(Date.now()/1000 - tsUs/1e6) : 0;
+    pythOk      = true;
+
+    renderPythPanel(pythPrice, pythConf, pythAge, pythCPct);
     dot('sb-pyth','#7a8fff');
     const lbl=document.getElementById('sb-primary-label');
     lbl.style.color='#7a8fff';
     txt('sb-pyth-lbl',`$${pythPrice.toFixed(2)} ±${pythConf.toFixed(4)} (age ${pythAge}s)`);
-    dot('dws','#7a8fff');txt('sws',`$${pythPrice.toFixed(2)} · ${confQuality(pythCPct).label}`);
+    dot('dws','#7a8fff');
+    txt('sws',`$${pythPrice.toFixed(2)} · ${confQuality(pythCPct).label}`);
+
     // Use Pyth as primary price if Twelvedata not yet available
     if(price===null||Math.abs(pythPrice-(price||0))<5){
       prevP=price||pythPrice;
@@ -722,7 +742,7 @@ async function fetchPyth(){
       renderPrice(pythPrice,false,true);
       setPill('PYTH LIVE','pyth');
     }
-    // Re-run signals with latest Pyth confidence data
+    // Re-run signals
     if(bars.length>=10&&price){
       sig=calcSig(bars,price);
       renderSig(sig);renderBreak(sig);drawSpark(bars,sig?.dir);
@@ -732,8 +752,9 @@ async function fetchPyth(){
     pythOk=false;
     dot('sb-pyth','#ff3344');
     txt('sb-pyth-lbl',`Error: ${err.message}`);
-    dot('dws','#ff3344');txt('sws','Pyth error');
-    // Don't block candles/TD operation
+    dot('dws','#ff3344');
+    txt('sws',`Pyth error: ${err.message.substring(0,30)}`);
+    // Don't block Twelvedata — it still runs independently
   }
 }
 
